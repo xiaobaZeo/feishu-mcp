@@ -67,7 +67,7 @@ public class McpController {
     /**
      * 发送消息
      */
-    @PostMapping
+    @PostMapping(consumes = "application/json")
     public Mono<JsonRpcResponse> handleMessage(@RequestBody JsonRpcRequest request) {
         log.debug("收到消息: method={}", request.getMethod());
         try {

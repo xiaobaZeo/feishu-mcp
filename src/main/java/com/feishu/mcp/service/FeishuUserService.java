@@ -42,7 +42,7 @@ public class FeishuUserService {
      * 根据关键词搜索企业用户
      */
     public List<Map<String, Object>> searchUsers(String keyword, int pageSize, int page) throws IOException {
-        String url = feishuProperties.getApiBaseUrl() + "/open_apis/contact/v3/users/find_by_cha";
+        String url = feishuProperties.getApiBaseUrl() + "/contact/v3/users/find_by_cha";
 
         String requestBody = String.format("""
                 {
@@ -83,7 +83,7 @@ public class FeishuUserService {
      * 获取用户信息
      */
     public Map<String, Object> getUserInfo(String userId) throws IOException {
-        String url = feishuProperties.getApiBaseUrl() + "/open_apis/contact/v3/users/" + userId;
+        String url = feishuProperties.getApiBaseUrl() + "/contact/v3/users/" + userId;
 
         Request request = new Request.Builder()
                 .url(url)

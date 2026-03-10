@@ -44,7 +44,7 @@ public class FeishuAuthService {
             return tenantAccessToken;
         }
 
-        String url = feishuProperties.getApiBaseUrl() + "/authen/v1/tenant_access_token/internal";
+        String url = feishuProperties.getApiBaseUrl() + "/auth/v3/tenant_access_token/internal";
 
         String requestBody = String.format("""
                 {
@@ -79,7 +79,7 @@ public class FeishuAuthService {
      * 获取user_access_token（用户授权）
      */
     public String getUserAccessToken(String code) throws IOException {
-        String url = feishuProperties.getApiBaseUrl() + "/authen/v1/authorize_access_token/internal";
+        String url = feishuProperties.getApiBaseUrl() + "/authen/v1/oidc/access_token";
 
         String requestBody = String.format("""
                 {

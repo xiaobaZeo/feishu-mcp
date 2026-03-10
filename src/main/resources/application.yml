@@ -15,7 +15,7 @@ feishu:
   # 用户授权时的授权码（前端获取后传入）
   user-code: ${FEISHU_USER_CODE:}
   # 飞书API基础URL
-  api-base-url: https://open.feishu.cn/open_api
+  api-base-url: https://open.feishu.cn/open-apis
 
 mcp:
   server:

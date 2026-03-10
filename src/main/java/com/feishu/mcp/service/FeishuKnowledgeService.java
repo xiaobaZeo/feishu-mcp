@@ -47,7 +47,7 @@ public class FeishuKnowledgeService {
     public Map<String, Object> getNodeDocuments(String nodeId, int pageSize, String pageToken) throws IOException {
         StringBuilder urlBuilder = new StringBuilder();
         urlBuilder.append(feishuProperties.getApiBaseUrl())
-                .append("/open_apis/knowledge/v1/nodes/")
+                .append("/knowledge/v1/nodes/")
                 .append(nodeId)
                 .append("/documents")
                 .append("?page_size=").append(pageSize);
@@ -99,7 +99,7 @@ public class FeishuKnowledgeService {
      * 获取知识空间列表
      */
     public List<Map<String, Object>> listSpaces() throws IOException {
-        String url = feishuProperties.getApiBaseUrl() + "/open_apis/knowledge/v1/spaces";
+        String url = feishuProperties.getApiBaseUrl() + "/knowledge/v1/spaces";
 
         Request request = new Request.Builder()
                 .url(url)
@@ -130,7 +130,7 @@ public class FeishuKnowledgeService {
      * 获取知识空间节点列表
      */
     public List<Map<String, Object>> listNodes(String spaceId) throws IOException {
-        String url = feishuProperties.getApiBaseUrl() + "/open_apis/knowledge/v1/spaces/" + spaceId + "/nodes";
+        String url = feishuProperties.getApiBaseUrl() + "/knowledge/v1/spaces/" + spaceId + "/nodes";
 
         Request request = new Request.Builder()
                 .url(url)

@@ -43,7 +43,7 @@ public class FeishuDocService {
      * @param page 页码
      */
     public List<Map<String, Object>> searchDocs(String query, String creator, int pageSize, int page) throws IOException {
-        String url = feishuProperties.getApiBaseUrl() + "/open_apis/search/v1/quick";
+        String url = feishuProperties.getApiBaseUrl() + "/search/v1/quick";
 
         StringBuilder requestBodyBuilder = new StringBuilder();
         requestBodyBuilder.append("{");
@@ -91,7 +91,7 @@ public class FeishuDocService {
      * @param content 文档内容（可选）
      */
     public Map<String, Object> createDoc(String nodeId, String title, String content) throws IOException {
-        String url = feishuProperties.getApiBaseUrl() + "/open_apis/docx/v1/documents";
+        String url = feishuProperties.getApiBaseUrl() + "/docx/v1/documents";
 
         StringBuilder requestBodyBuilder = new StringBuilder();
         requestBodyBuilder.append("{");
@@ -132,7 +132,7 @@ public class FeishuDocService {
      * 获取云文档内容
      */
     public Map<String, Object> getDoc(String documentId) throws IOException {
-        String url = feishuProperties.getApiBaseUrl() + "/open_apis/docx/v1/documents/" + documentId;
+        String url = feishuProperties.getApiBaseUrl() + "/docx/v1/documents/" + documentId;
 
         Request request = new Request.Builder()
                 .url(url)
@@ -162,7 +162,7 @@ public class FeishuDocService {
      * @param requests 更新请求数组
      */
     public Map<String, Object> updateDoc(String documentId, List<Map<String, Object>> requests) throws IOException {
-        String url = feishuProperties.getApiBaseUrl() + "/open_apis/docx/v1/documents/" + documentId;
+        String url = feishuProperties.getApiBaseUrl() + "/docx/v1/documents/" + documentId;
 
         StringBuilder requestBodyBuilder = new StringBuilder();
         requestBodyBuilder.append("{\"requests\": [");
@@ -205,7 +205,7 @@ public class FeishuDocService {
      * 获取文档评论列表
      */
     public List<Map<String, Object>> getDocComments(String documentId) throws IOException {
-        String url = feishuProperties.getApiBaseUrl() + "/open_apis/docx/v1/documents/" + documentId + "/comments";
+        String url = feishuProperties.getApiBaseUrl() + "/docx/v1/documents/" + documentId + "/comments";
 
         Request request = new Request.Builder()
                 .url(url)
@@ -242,7 +242,7 @@ public class FeishuDocService {
      * 添加文档评论
      */
     public Map<String, Object> addDocComment(String documentId, String content, String quote) throws IOException {
-        String url = feishuProperties.getApiBaseUrl() + "/open_apis/docx/v1/documents/" + documentId + "/comments";
+        String url = feishuProperties.getApiBaseUrl() + "/docx/v1/documents/" + documentId + "/comments";
 
         StringBuilder requestBodyBuilder = new StringBuilder();
         requestBodyBuilder.append("{");

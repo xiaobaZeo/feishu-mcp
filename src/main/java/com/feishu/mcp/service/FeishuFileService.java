@@ -39,7 +39,7 @@ public class FeishuFileService {
      * @return 文件内容的Base64编码
      */
     public Map<String, Object> getFileContent(String fileToken) throws IOException {
-        String url = feishuProperties.getApiBaseUrl() + "/open_apis/drive/v1/files/" + fileToken + "/content";
+        String url = feishuProperties.getApiBaseUrl() + "/drive/v1/files/" + fileToken + "/content";
 
         Request request = new Request.Builder()
                 .url(url)
@@ -71,7 +71,7 @@ public class FeishuFileService {
      * 获取文件元信息
      */
     public Map<String, Object> getFileInfo(String fileToken) throws IOException {
-        String url = feishuProperties.getApiBaseUrl() + "/open_apis/drive/v1/files/" + fileToken;
+        String url = feishuProperties.getApiBaseUrl() + "/drive/v1/files/" + fileToken;
 
         Request request = new Request.Builder()
                 .url(url)
