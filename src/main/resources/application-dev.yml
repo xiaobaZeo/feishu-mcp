@@ -1,0 +1,51 @@
+server:
+  port: 8088
+
+spring:
+  application:
+    name: feishu-mcp-server
+  main:
+    web-application-type: reactive
+
+feishu:
+  app-id: ${FEISHU_APP_ID:}
+  app-secret: ${FEISHU_APP_SECRET:}
+  auth-mode: ${FEISHU_AUTH_MODE:app}
+  user-code: ${FEISHU_USER_CODE:}
+  api-base-url: https://open.feishu.cn/open_api
+
+mcp:
+  server:
+    name: feishu-mcp-server
+    version: 1.0.0
+    transport: ${MCP_SERVER_TRANSPORT:both}
+    sse:
+      host: 0.0.0.0
+      port: 8088
+      path: /mcp
+
+logging:
+  level:
+    com.feishu.mcp: DEBUG
+    com.feishu.mcp.mcp.protocol.JsonRpcHandler: TRACE
+    okhttp3: DEBUG
+    org.springframework.web: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+
+info:
+  app:
+    name: feishu-mcp-server
+    version: 1.0.0
+    description: 飞书MCP服务器（开发环境）
