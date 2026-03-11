@@ -2,6 +2,7 @@ package com.feishu.mcp.mcp.protocol;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.feishu.mcp.constant.McpConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -51,11 +52,12 @@ public class JsonRpcHandler {
                 case "tools/call" -> handleToolsCall(id, request.getParams());
                 case "resources/list" -> handleResourcesList(id);
                 case "resources/templates/list" -> handleResourceTemplatesList(id);
-                default -> JsonRpcResponse.error(id, -32601, "Method not found: " + method);
+                default ->
+                        JsonRpcResponse.error(id, McpConstants.ERROR_METHOD_NOT_FOUND, "Method not found: " + method);
             };
         } catch (Exception e) {
             log.error("处理请求失败: method={}", method, e);
-            return JsonRpcResponse.error(id, -32603, "Internal error: " + e.getMessage());
+            return JsonRpcResponse.error(id, McpConstants.ERROR_INTERNAL_ERROR, "Internal error: " + e.getMessage());
         }
     }
 
@@ -105,7 +107,7 @@ public class JsonRpcHandler {
 
         McpTool tool = toolMap.get(toolName);
         if (tool == null) {
-            return JsonRpcResponse.error(id, -32602, "Tool not found: " + toolName);
+            return JsonRpcResponse.error(id, McpConstants.ERROR_INVALID_PARAMS, "Tool not found: " + toolName);
         }
 
         try {
@@ -121,7 +123,7 @@ public class JsonRpcHandler {
             return JsonRpcResponse.success(id, response);
         } catch (Exception e) {
             log.error("执行工具失败: tool={}", toolName, e);
-            return JsonRpcResponse.error(id, -32603, "Tool execution failed: " + e.getMessage());
+            return JsonRpcResponse.error(id, McpConstants.ERROR_INTERNAL_ERROR, "Tool execution failed: " + e.getMessage());
         }
     }
 

@@ -1,5 +1,6 @@
 package com.feishu.mcp.controller;
 
+import com.feishu.mcp.constant.McpConstants;
 import com.feishu.mcp.mcp.protocol.JsonRpcHandler;
 import com.feishu.mcp.mcp.protocol.JsonRpcRequest;
 import com.feishu.mcp.mcp.protocol.JsonRpcResponse;
@@ -48,7 +49,7 @@ public class McpController {
 
         // 发送初始化事件
         Map<String, Object> initParams = new HashMap<>();
-        initParams.put("protocolVersion", "2024-11-05");
+        initParams.put("protocolVersion", McpConstants.PROTOCOL_VERSION);
         initParams.put("capabilities", new HashMap<>());
 
         JsonRpcResponse initResponse = jsonRpcHandler.handle(createRequest("initialize", initParams));
@@ -77,7 +78,7 @@ public class McpController {
             log.error("处理消息失败", e);
             return Mono.just(JsonRpcResponse.error(
                     request.getId(),
-                    -32603,
+                    McpConstants.ERROR_INTERNAL_ERROR,
                     "Internal error: " + e.getMessage()
             ));
         }

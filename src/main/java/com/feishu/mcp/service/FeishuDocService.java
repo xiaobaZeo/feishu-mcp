@@ -441,7 +441,7 @@ public class FeishuDocService {
      */
     public Map<String, Object> clearDoc(String documentId) throws IOException {
         // 强制刷新token，确保使用最新权限
-        feishuAuthService.forceRefreshToken();
+//        feishuAuthService.forceRefreshToken();
 
         // 1. 获取文档块列表，找到 page 块及其子块
         String blocksUrl = feishuProperties.getApiBaseUrl() + "/docx/v1/documents/" + documentId + "/blocks";

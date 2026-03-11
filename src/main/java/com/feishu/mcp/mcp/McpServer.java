@@ -65,12 +65,9 @@ public class McpServer implements CommandLineRunner {
                 JsonRpcRequest request = objectMapper.readValue(line, JsonRpcRequest.class);
                 JsonRpcResponse response = jsonRpcHandler.handle(request);
                 String responseJson = objectMapper.writeValueAsString(response);
-                System.out.println(responseJson);
-                System.out.flush();
+                log.debug("响应: {}", responseJson);
             } catch (Exception e) {
                 log.error("处理请求失败", e);
-                System.err.println("{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"Internal error\"}}");
-                System.err.flush();
             }
         }
     }
