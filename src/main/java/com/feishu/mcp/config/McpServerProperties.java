@@ -13,7 +13,7 @@ public class McpServerProperties {
     private String name = "feishu-mcp-server";
     private String version = "1.0.0";
     private String transport = "both";
-    private SseProperties sse = new SseProperties();
+    private HttpProperties http = new HttpProperties();
 
     public String getName() {
         return name;
@@ -39,15 +39,15 @@ public class McpServerProperties {
         this.transport = transport;
     }
 
-    public SseProperties getSse() {
-        return sse;
+    public HttpProperties getHttp() {
+        return http;
     }
 
-    public void setSse(SseProperties sse) {
-        this.sse = sse;
+    public void setHttp(HttpProperties http) {
+        this.http = http;
     }
 
-    public static class SseProperties {
+    public static class HttpProperties {
         private String host = "0.0.0.0";
         private int port = 8088;
         private String path = "/mcp";

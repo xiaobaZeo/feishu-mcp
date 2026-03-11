@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
 import java.util.Scanner;
 
 /**
- * MCP服务器核心 - 支持STDIO和SSE两种模式
+ * MCP服务器核心 - 支持STDIO和HTTP两种模式
  */
 @Component
 public class McpServer implements CommandLineRunner {
@@ -42,7 +42,7 @@ public class McpServer implements CommandLineRunner {
             startStdioServer();
         }
 
-        // SSE模式由Spring WebFlux控制器处理，不需要在这里启动
+        // HTTP模式由Spring MVC控制器处理，不需要在这里启动
     }
 
     /**

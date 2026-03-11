@@ -3,354 +3,281 @@ package com.feishu.mcp.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feishu.mcp.config.FeishuProperties;
-import okhttp3.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.feishu.mcp.constant.DocBlockType;
+import com.feishu.mcp.dto.doc.*;
+import com.feishu.mcp.exception.DocumentOperationException;
+import com.feishu.mcp.exception.FeishuApiException;
+import com.feishu.mcp.util.HttpClientUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.util.*;
-import java.util.concurrent.TimeUnit;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
- * 飞书云文档服务
+ * 飞书云文档服务（重构版）
+ * 使用 DTO 替代手动 JSON 拼接，支持多种文档操作
  */
+@Slf4j
 @Service
 public class FeishuDocService {
 
-    private static final Logger log = LoggerFactory.getLogger(FeishuDocService.class);
-
     private final FeishuAuthService feishuAuthService;
     private final FeishuProperties feishuProperties;
+    private final HttpClientUtil httpClient;
     private final ObjectMapper objectMapper;
 
-    private final OkHttpClient httpClient = new OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .build();
-
-    public FeishuDocService(FeishuAuthService feishuAuthService, FeishuProperties feishuProperties, ObjectMapper objectMapper) {
+    public FeishuDocService(FeishuAuthService feishuAuthService,
+                            FeishuProperties feishuProperties,
+                            HttpClientUtil httpClient,
+                            ObjectMapper objectMapper) {
         this.feishuAuthService = feishuAuthService;
         this.feishuProperties = feishuProperties;
+        this.httpClient = httpClient;
         this.objectMapper = objectMapper;
     }
 
+    // ==================== 文档搜索 ====================
+
     /**
      * 搜索云文档
-     * @param query 关键词
-     * @param creator 创建者ID
-     * @param pageSize 每页数量
-     * @param page 页码
      */
-    public List<Map<String, Object>> searchDocs(String query, String creator, int pageSize, int page) throws IOException {
-        String url = feishuProperties.getApiBaseUrl() + "/search/v1/quick";
+    public List<DocSearchResult> searchDocs(DocSearchRequest request) throws IOException {
+        String url = buildUrl("/search/v1/quick");
 
-        StringBuilder requestBodyBuilder = new StringBuilder();
-        requestBodyBuilder.append("{");
-        requestBodyBuilder.append("\"query\": \"").append(query).append("\"");
-        requestBodyBuilder.append(", \"page_size\": ").append(pageSize);
-        requestBodyBuilder.append(", \"page\": ").append(page);
-        if (creator != null && !creator.isEmpty()) {
-            requestBodyBuilder.append(", \"creator\": \"").append(creator).append("\"");
+        // 构建请求体
+        Map<String, Object> body = new HashMap<>();
+        body.put("query", request.getQuery());
+        body.put("page_size", request.getPageSize());
+        body.put("page", request.getPage());
+        if (request.getCreator() != null && !request.getCreator().isEmpty()) {
+            body.put("creator", request.getCreator());
         }
-        requestBodyBuilder.append("}");
 
-        Request request = new Request.Builder()
-                .url(url)
-                .post(RequestBody.create(requestBodyBuilder.toString(), MediaType.parse("application/json")))
-                .addHeader("Authorization", "Bearer " + feishuAuthService.getAccessToken())
-                .build();
+        FeishuApiResponse<SearchResponseData> response = httpClient.post(
+                url,
+                feishuAuthService.getAccessToken(),
+                body,
+                SearchResponseData.class
+        );
 
-        try (Response response = httpClient.newCall(request).execute()) {
-            String responseBody = response.body().string();
-            JsonNode jsonNode = objectMapper.readTree(responseBody);
-
-            List<Map<String, Object>> docs = new ArrayList<>();
-            if (jsonNode.has("data") && jsonNode.get("data").has("items")) {
-                JsonNode items = jsonNode.get("data").get("items");
-                for (JsonNode item : items) {
-                    Map<String, Object> doc = new HashMap<>();
-                    doc.put("document_id", item.has("document_id") ? item.get("document_id").asText() : null);
-                    doc.put("title", item.has("title") ? item.get("title").asText() : null);
-                    doc.put("doc_type", item.has("doc_type") ? item.get("doc_type").asText() : null);
-                    doc.put("url", item.has("url") ? item.get("url").asText() : null);
-                    doc.put("creator", item.has("creator") ? item.get("creator").asText() : null);
-                    doc.put("created_time", item.has("created_time") ? item.get("created_time").asText() : null);
-                    doc.put("updated_time", item.has("updated_time") ? item.get("updated_time").asText() : null);
-                    docs.add(doc);
-                }
-            }
-            return docs;
-        }
+        return convertSearchResults(response.getData());
     }
+
+    /**
+     * 搜索响应数据结构
+     */
+    private static class SearchResponseData {
+        public List<JsonNode> items;
+        public Integer total;
+    }
+
+    private List<DocSearchResult> convertSearchResults(SearchResponseData data) {
+        List<DocSearchResult> results = new ArrayList<>();
+        if (data == null || data.items == null) {
+            return results;
+        }
+
+        for (JsonNode item : data.items) {
+            DocSearchResult result = new DocSearchResult();
+            result.setDocumentId(getText(item, "document_id"));
+            result.setTitle(getText(item, "title"));
+            result.setDocType(getText(item, "doc_type"));
+            result.setUrl(getText(item, "url"));
+            result.setCreator(getText(item, "creator"));
+            result.setCreateTime(getText(item, "create_time"));
+            result.setUpdateTime(getText(item, "update_time"));
+            result.setSpaceName(getText(item, "space_name"));
+            result.setNodeId(getText(item, "node_id"));
+            results.add(result);
+        }
+        return results;
+    }
+
+    // ==================== 文档创建 ====================
 
     /**
      * 创建云文档
-     * @param nodeId 知识空间节点ID（可选，为空则创建在我的文档库）
-     * @param title 文档标题
-     * @param content 文档内容（可选）
      */
-    public Map<String, Object> createDoc(String nodeId, String title, String content) throws IOException {
-        String url = feishuProperties.getApiBaseUrl() + "/docx/v1/documents";
+    public DocCreateResponse createDoc(DocCreateRequest request) throws IOException {
+        String url = buildUrl("/docx/v1/documents");
 
-        StringBuilder requestBodyBuilder = new StringBuilder();
-        requestBodyBuilder.append("{");
-        requestBodyBuilder.append("\"node_id\": \"").append(nodeId != null ? nodeId : "").append("\"");
-        requestBodyBuilder.append(", \"document\": {");
-        requestBodyBuilder.append("\"title\": \"").append(title).append("\"");
-        if (content != null && !content.isEmpty()) {
-            requestBodyBuilder.append(", \"content\": [[{\"tag\": \"text\", \"text\": \"");
-            // 转义content中的特殊字符
-            String escapedContent = content.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
-            requestBodyBuilder.append(escapedContent).append("\"}]]");
+        // 构建请求体
+        Map<String, Object> document = new HashMap<>();
+        document.put("title", request.getTitle());
+
+        // 处理内容
+        if (request.getContentBlocks() != null && !request.getContentBlocks().isEmpty()) {
+            // 使用结构化内容块
+            document.put("content", request.getContentBlocks());
+        } else if (request.getContent() != null && !request.getContent().isEmpty()) {
+            // 使用纯文本内容，转换为块格式
+            document.put("content", convertTextToBlocks(request.getContent()));
         }
-        requestBodyBuilder.append("}");
-        requestBodyBuilder.append("}");
 
-        Request request = new Request.Builder()
-                .url(url)
-                .post(RequestBody.create(requestBodyBuilder.toString(), MediaType.parse("application/json")))
-                .addHeader("Authorization", "Bearer " + feishuAuthService.getAccessToken())
-                .build();
+        Map<String, Object> body = new HashMap<>();
+        if (request.getNodeId() != null && !request.getNodeId().isEmpty()) {
+            body.put("node_id", request.getNodeId());
+        }
+        body.put("document", document);
 
-        try (Response response = httpClient.newCall(request).execute()) {
-            String responseBody = response.body().string();
-            JsonNode jsonNode = objectMapper.readTree(responseBody);
+        try {
+            FeishuApiResponse<CreateResponseData> response = httpClient.post(
+                    url,
+                    feishuAuthService.getAccessToken(),
+                    body,
+                    CreateResponseData.class
+            );
 
-            Map<String, Object> result = new HashMap<>();
-            if (jsonNode.has("data") && jsonNode.get("data").has("document")) {
-                JsonNode doc = jsonNode.get("data").get("document");
-                result.put("document_id", doc.has("document_id") ? doc.get("document_id").asText() : null);
-                result.put("token", doc.has("token") ? doc.get("token").asText() : null);
-                result.put("url", "https://open.feishu.com/document/" + (doc.has("token") ? doc.get("token").asText() : ""));
+            return DocCreateResponse.builder()
+                    .success(true)
+                    .documentId(getText(response.getData().document, "document_id"))
+                    .token(getText(response.getData().document, "document_token"))
+                    .url(getText(response.getData().document, "url"))
+                    .title(request.getTitle())
+                    .createTime(System.currentTimeMillis())
+                    .build();
+        } catch (FeishuApiException e) {
+            return DocCreateResponse.builder()
+                    .success(false)
+                    .title(request.getTitle())
+                    .errorMessage(e.getApiMessage())
+                    .build();
+        }
+    }
+
+    private static class CreateResponseData {
+        public JsonNode document;
+    }
+
+    /**
+     * 将纯文本转换为飞书文档块格式
+     */
+    private List<List<Map<String, Object>>> convertTextToBlocks(String text) {
+        List<List<Map<String, Object>>> blocks = new ArrayList<>();
+
+        String[] lines = text.split("\n");
+        for (String line : lines) {
+            if (line.trim().isEmpty()) {
+                continue;
             }
-            return result;
+
+            List<Map<String, Object>> block = new ArrayList<>();
+            Map<String, Object> element = new HashMap<>();
+            element.put("tag", "text");
+            element.put("text", line);
+            block.add(element);
+            blocks.add(block);
         }
+
+        return blocks;
+    }
+
+    // ==================== 文档获取 ====================
+
+    /**
+     * 获取云文档基本信息
+     */
+    public DocContent getDoc(String documentId) throws IOException {
+        String url = buildUrl("/docx/v1/documents/" + documentId);
+
+        FeishuApiResponse<JsonNode> response = httpClient.get(
+                url,
+                feishuAuthService.getAccessToken(),
+                JsonNode.class
+        );
+
+        JsonNode docNode = response.getData().get("document");
+
+        return DocContent.builder()
+                .documentId(getText(docNode, "document_id"))
+                .title(getText(docNode, "title"))
+                .revision(getLong(docNode, "revision"))
+                .build();
     }
 
     /**
-     * 获取云文档内容
+     * 获取云文档完整内容（包括块）
      */
-    public Map<String, Object> getDoc(String documentId) throws IOException {
-        String url = feishuProperties.getApiBaseUrl() + "/docx/v1/documents/" + documentId;
+    public DocContent getDocWithBlocks(String documentId) throws IOException {
+        // 1. 获取文档基本信息
+        DocContent docContent = getDoc(documentId);
 
-        Request request = new Request.Builder()
-                .url(url)
-                .get()
-                .addHeader("Authorization", "Bearer " + feishuAuthService.getAccessToken())
-                .build();
+        // 2. 获取文档块列表
+        List<DocBlock> blocks = getDocBlocks(documentId, 500);
+        docContent.setBlocks(blocks);
 
-        try (Response response = httpClient.newCall(request).execute()) {
-            String responseBody = response.body().string();
-            JsonNode jsonNode = objectMapper.readTree(responseBody);
-
-            Map<String, Object> result = new HashMap<>();
-            if (jsonNode.has("data") && jsonNode.get("data").has("document")) {
-                JsonNode doc = jsonNode.get("data").get("document");
-                result.put("document_id", doc.has("document_id") ? doc.get("document_id").asText() : null);
-                result.put("title", doc.has("title") ? doc.get("title").asText() : null);
-                result.put("content", doc.has("body") ? doc.get("body").toString() : null);
-                result.put("raw_response", jsonNode.toString());
-            }
-            return result;
-        }
+        return docContent;
     }
 
     /**
-     * 更新云文档
-     * @param documentId 文档ID
-     * @param requests 更新请求数组
+     * 获取文档块列表
      */
-    public Map<String, Object> updateDoc(String documentId, List<Map<String, Object>> requests) throws IOException {
-        String url = feishuProperties.getApiBaseUrl() + "/docx/v1/documents/" + documentId;
+    public List<DocBlock> getDocBlocks(String documentId, int pageSize) throws IOException {
+        String url = buildUrl("/docx/v1/documents/" + documentId + "/blocks?page_size=" + pageSize);
 
-        StringBuilder requestBodyBuilder = new StringBuilder();
-        requestBodyBuilder.append("{\"requests\": [");
-        for (int i = 0; i < requests.size(); i++) {
-            Map<String, Object> req = requests.get(i);
-            if (i > 0) requestBodyBuilder.append(", ");
-            requestBodyBuilder.append("{");
-            requestBodyBuilder.append("\"type\": \"").append(req.get("type")).append("\"");
-            requestBodyBuilder.append(", \"range\": {");
-            requestBodyBuilder.append("\"start_index\": ").append(req.get("start_index"));
-            requestBodyBuilder.append(", \"end_index\": ").append(req.get("end_index"));
-            requestBodyBuilder.append("}");
-            requestBodyBuilder.append(", \"body\": [");
-            requestBodyBuilder.append("[{\"tag\": \"text\", \"text\": \"");
-            String text = ((String) req.get("text")).replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
-            requestBodyBuilder.append(text).append("\"}]");
-            requestBodyBuilder.append("]");
-            requestBodyBuilder.append("}");
+        FeishuApiResponse<BlockListData> response = httpClient.get(
+                url,
+                feishuAuthService.getAccessToken(),
+                BlockListData.class
+        );
+
+        return convertBlocks(response.getData());
+    }
+
+    private static class BlockListData {
+        public List<JsonNode> items;
+    }
+
+    private List<DocBlock> convertBlocks(BlockListData data) {
+        List<DocBlock> blocks = new ArrayList<>();
+        if (data == null || data.items == null) {
+            return blocks;
         }
-        requestBodyBuilder.append("]}");
 
-        Request request = new Request.Builder()
-                .url(url)
-                .patch(RequestBody.create(requestBodyBuilder.toString(), MediaType.parse("application/json")))
-                .addHeader("Authorization", "Bearer " + feishuAuthService.getAccessToken())
-                .build();
+        for (JsonNode item : data.items) {
+            DocBlockType blockType = DocBlockType.fromCode(getInt(item, "block_type", 0));
 
-        try (Response response = httpClient.newCall(request).execute()) {
-            String responseBody = response.body().string();
-            JsonNode jsonNode = objectMapper.readTree(responseBody);
+            DocBlock block = DocBlock.builder()
+                    .blockId(getText(item, "block_id"))
+                    .parentId(getText(item, "parent_id"))
+                    .blockType(blockType)
+                    .blockTypeCode(getInt(item, "block_type", 0))
+                    .childrenCount(getInt(item, "children_count", 0))
+                    .content(extractBlockText(item))
+                    .build();
 
-            Map<String, Object> result = new HashMap<>();
-            result.put("success", jsonNode.has("data"));
-            result.put("raw_response", jsonNode.toString());
-            return result;
+            blocks.add(block);
         }
+        return blocks;
     }
 
     /**
-     * 更新云文档内容 - 使用 batch_update 在指定块位置增加或替换内容
-     * @param documentId 文档ID
-     * @param text 要更新的文本内容
-     * @param operation 操作类型：insert（追加）或 replace（替换）
-     * @param blockIndex 内容块索引（从0开始，0表示第一个可编辑内容块）
+     * 从块中提取文本内容
      */
-    public Map<String, Object> updateDocContent(String documentId, String text, String operation, int blockIndex) throws IOException {
-        // 1. 获取文档块列表
-        String blocksUrl = feishuProperties.getApiBaseUrl() + "/docx/v1/documents/" + documentId + "/blocks";
-
-        Request getRequest = new Request.Builder()
-                .url(blocksUrl + "?page_size=500")
-                .get()
-                .addHeader("Authorization", "Bearer " + feishuAuthService.getAccessToken())
-                .build();
-
-        List<String> editableBlockIds = new ArrayList<>();
-        try (Response response = httpClient.newCall(getRequest).execute()) {
-            String responseBody = response.body().string();
-            JsonNode jsonNode = objectMapper.readTree(responseBody);
-
-            if (jsonNode.has("data") && jsonNode.get("data").has("items")) {
-                JsonNode items = jsonNode.get("data").get("items");
-                for (JsonNode item : items) {
-                    if (item.has("block_id") && item.has("block_type")) {
-                        int blockType = item.get("block_type").asInt();
-                        // 跳过 page 块(1)，收集所有可编辑的块
-                        if (blockType != 1) {
-                            editableBlockIds.add(item.get("block_id").asText());
-                        }
-                    }
-                }
-            }
-        }
-
-        Map<String, Object> result = new HashMap<>();
-
-        if (editableBlockIds.isEmpty()) {
-            result.put("success", false);
-            result.put("error", "未找到可编辑的块");
-            return result;
-        }
-
-        if (blockIndex < 0 || blockIndex >= editableBlockIds.size()) {
-            result.put("success", false);
-            result.put("error", "block_index 超出范围，有效范围是 0 到 " + (editableBlockIds.size() - 1));
-            result.put("total_editable_blocks", editableBlockIds.size());
-            return result;
-        }
-
-        String targetBlockId = editableBlockIds.get(blockIndex);
-
-        // 2. 根据操作类型构建请求体
-        String requestBodyJson;
-        String escapedText = text.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
-
-        if ("insert".equals(operation)) {
-            // insert 操作：先获取现有内容，然后追加新内容
-            String existingContent = getBlockContent(documentId, targetBlockId);
-            String newContent = existingContent + text;
-            String escapedNewContent = newContent.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
-            requestBodyJson = "{\"requests\": [{\"block_id\": \"" + targetBlockId + "\", \"update_text_elements\": {\"elements\": [{\"text_run\": {\"content\": \"" + escapedNewContent + "\"}}]}}]}";
-        } else {
-            // replace 操作：直接替换为指定内容
-            requestBodyJson = "{\"requests\": [{\"block_id\": \"" + targetBlockId + "\", \"update_text_elements\": {\"elements\": [{\"text_run\": {\"content\": \"" + escapedText + "\"}}]}}]}";
-        }
-
-        String patchUrl = feishuProperties.getApiBaseUrl() + "/docx/v1/documents/" + documentId + "/blocks/batch_update";
-
-        Request patchRequest = new Request.Builder()
-                .url(patchUrl)
-                .patch(RequestBody.create(requestBodyJson, MediaType.parse("application/json")))
-                .addHeader("Authorization", "Bearer " + feishuAuthService.getAccessToken())
-                .build();
-
-        try (Response response = httpClient.newCall(patchRequest).execute()) {
-            String responseBody = response.body().string();
-            JsonNode jsonNode = objectMapper.readTree(responseBody);
-
-            result.put("success", jsonNode.has("data"));
-            result.put("raw_response", jsonNode.toString());
-            result.put("updated_block_id", targetBlockId);
-            result.put("block_index", blockIndex);
-            result.put("operation", operation);
-        }
-
-        return result;
-    }
-
-    /**
-     * 获取指定块的内容（辅助方法）
-     */
-    private String getBlockContent(String documentId, String blockId) throws IOException {
-        String url = feishuProperties.getApiBaseUrl() + "/docx/v1/documents/" + documentId + "/blocks/" + blockId;
-
-        Request request = new Request.Builder()
-                .url(url)
-                .get()
-                .addHeader("Authorization", "Bearer " + feishuAuthService.getAccessToken())
-                .build();
-
-        try (Response response = httpClient.newCall(request).execute()) {
-            String responseBody = response.body().string();
-            JsonNode jsonNode = objectMapper.readTree(responseBody);
-
-            if (jsonNode.has("data") && jsonNode.get("data").has("block")) {
-                JsonNode block = jsonNode.get("data").get("block");
-                // 尝试从不同类型的块中提取文本内容
-                String content = extractTextFromBlock(block);
-                return content != null ? content : "";
-            }
-        }
-        return "";
-    }
-
-    /**
-     * 从块中提取文本内容（辅助方法）
-     */
-    private String extractTextFromBlock(JsonNode block) {
+    private String extractBlockText(JsonNode block) {
         // 尝试从不同块类型中提取文本
-        if (block.has("text") && block.get("text").has("elements")) {
-            return extractTextFromElements(block.get("text").get("elements"));
-        }
-        if (block.has("heading1") && block.get("heading1").has("elements")) {
-            return extractTextFromElements(block.get("heading1").get("elements"));
-        }
-        if (block.has("heading2") && block.get("heading2").has("elements")) {
-            return extractTextFromElements(block.get("heading2").get("elements"));
-        }
-        if (block.has("heading3") && block.get("heading3").has("elements")) {
-            return extractTextFromElements(block.get("heading3").get("elements"));
-        }
-        if (block.has("quote") && block.get("quote").has("elements")) {
-            return extractTextFromElements(block.get("quote").get("elements"));
-        }
-        if (block.has("bulleted_list") && block.get("bulleted_list").has("elements")) {
-            return extractTextFromElements(block.get("bulleted_list").get("elements"));
-        }
-        if (block.has("numbered_list") && block.get("numbered_list").has("elements")) {
-            return extractTextFromElements(block.get("numbered_list").get("elements"));
+        String[] blockTypeFields = {"text", "heading1", "heading2", "heading3", "heading4",
+                "heading5", "heading6", "heading7", "heading8", "heading9",
+                "bulleted_list", "numbered_list", "code", "quote"};
+
+        for (String field : blockTypeFields) {
+            if (block.has(field) && block.get(field).has("elements")) {
+                return extractTextFromElements(block.get(field).get("elements"));
+            }
         }
         return "";
     }
 
-    /**
-     * 从 elements 中提取文本（辅助方法）
-     */
     private String extractTextFromElements(JsonNode elements) {
         StringBuilder text = new StringBuilder();
+        if (elements == null || !elements.isArray()) {
+            return "";
+        }
+
         for (JsonNode element : elements) {
             if (element.has("text_run") && element.get("text_run").has("content")) {
                 text.append(element.get("text_run").get("content").asText());
@@ -359,182 +286,553 @@ public class FeishuDocService {
         return text.toString();
     }
 
-    /**
-     * 获取文档评论列表
-     */
-    public List<Map<String, Object>> getDocComments(String documentId) throws IOException {
-        String url = feishuProperties.getApiBaseUrl() + "/docx/v1/documents/" + documentId + "/comments";
+    // ==================== 文档更新 ====================
 
-        Request request = new Request.Builder()
-                .url(url)
-                .get()
-                .addHeader("Authorization", "Bearer " + feishuAuthService.getAccessToken())
+    /**
+     * 根据多种定位方式更新文档
+     */
+    public DocUpdateResponse updateDocContent(String documentId, String text,
+                                               String operation, DocumentLocation location) throws IOException {
+        // 1. 解析定位信息，获取目标块ID和是否为page块
+        BlockResolutionResult resolution = resolveBlockIdWithType(documentId, location);
+
+        if (resolution == null || resolution.getBlockId() == null) {
+            return DocUpdateResponse.error("无法解析定位信息: " + location.getLocationDescription(), null);
+        }
+
+        String targetBlockId = resolution.getBlockId();
+        boolean isPageBlock = resolution.isPageBlock();
+
+        // 2. 根据操作类型构建请求
+        List<DocBlockUpdate> requests = buildUpdateRequests(targetBlockId, text, operation, documentId, isPageBlock);
+
+        // 3. 执行更新
+        DocUpdateRequest updateRequest = DocUpdateRequest.builder()
+                .documentId(documentId)
+                .requests(requests)
                 .build();
 
-        try (Response response = httpClient.newCall(request).execute()) {
-            String responseBody = response.body().string();
-            JsonNode jsonNode = objectMapper.readTree(responseBody);
+        return updateDoc(documentId, updateRequest);
+    }
 
-            List<Map<String, Object>> comments = new ArrayList<>();
-            if (jsonNode.has("data") && jsonNode.get("data").has("items")) {
-                JsonNode items = jsonNode.get("data").get("items");
-                for (JsonNode item : items) {
-                    Map<String, Object> comment = new HashMap<>();
-                    comment.put("comment_id", item.has("comment_id") ? item.get("comment_id").asText() : null);
-                    comment.put("content", item.has("content") ? item.get("content").asText() : null);
-                    comment.put("created_by", item.has("created_by") ? item.get("created_by").asText() : null);
-                    comment.put("created_time", item.has("created_time") ? item.get("created_time").asText() : null);
-                    comment.put("is_root", item.has("is_root") ? item.get("is_root").asBoolean() : false);
-                    // 划词评论相关
-                    if (item.has("quote") && !item.get("quote").isNull()) {
-                        comment.put("quote", item.get("quote").asText());
+    /**
+     * 更新云文档
+     */
+    public DocUpdateResponse updateDoc(String documentId, DocUpdateRequest request) throws IOException {
+        String url = buildUrl("/docx/v1/documents/" + documentId + "/blocks/batch_update");
+
+        // 获取文档当前 revision
+        DocContent docContent = getDoc(documentId);
+        Long revisionId = docContent.getRevision();
+
+        // 构建请求体
+        List<Map<String, Object>> requests = new ArrayList<>();
+        for (DocBlockUpdate update : request.getRequests()) {
+            Map<String, Object> req = new HashMap<>();
+            req.put("block_id", update.getBlockId());
+
+            switch (update.getOperationType()) {
+                case "update_text_elements" -> {
+                    Map<String, Object> updateText = new HashMap<>();
+                    List<Map<String, Object>> elements = new ArrayList<>();
+
+                    for (DocElement element : update.getElements()) {
+                        Map<String, Object> el = new HashMap<>();
+                        el.put("tag", element.getTag());
+
+                        if ("text".equals(element.getTag())) {
+                            Map<String, Object> textRun = new HashMap<>();
+                            textRun.put("content", element.getText());
+                            el.put("text_run", textRun);
+                        }
+                        elements.add(el);
                     }
-                    comments.add(comment);
+
+                    updateText.put("elements", elements);
+                    req.put("update_text_elements", updateText);
+                }
+                case "insert_block_children" -> {
+                    // 使用单独的API在page块下添加子块
+                    // /docx/v1/documents/{document_id}/blocks/{block_id}/children
+                    String insertUrl = buildUrl("/docx/v1/documents/" + documentId +
+                            "/blocks/" + update.getBlockId() + "/children");
+
+                    // 构建要插入的子块
+                    List<Map<String, Object>> children = new ArrayList<>();
+                    for (DocElement element : update.getElements()) {
+                        Map<String, Object> child = new HashMap<>();
+                        child.put("block_type", 2); // text block
+
+                        Map<String, Object> textBlock = new HashMap<>();
+                        List<Map<String, Object>> childElements = new ArrayList<>();
+
+                        Map<String, Object> textRun = new HashMap<>();
+                        textRun.put("content", element.getText());
+
+                        Map<String, Object> el = new HashMap<>();
+                        el.put("text_run", textRun);
+
+                        childElements.add(el);
+                        textBlock.put("elements", childElements);
+                        child.put("text", textBlock);
+
+                        children.add(child);
+                    }
+
+                    Map<String, Object> insertBody = new HashMap<>();
+                    insertBody.put("children", children);
+                    if (update.getInsertIndex() != null) {
+                        insertBody.put("index", update.getInsertIndex());
+                    }
+
+                    log.debug("Insert children request body: {}", objectMapper.writeValueAsString(insertBody));
+
+                    FeishuApiResponse<JsonNode> insertResponse = httpClient.post(
+                            insertUrl,
+                            feishuAuthService.getAccessToken(),
+                            insertBody,
+                            JsonNode.class
+                    );
+
+                    log.debug("Insert children response: {}", insertResponse);
+
+                    // 跳过这个请求，因为我们已经处理了
+                    continue;
+                }
+                default -> throw new IllegalArgumentException("不支持的操作类型: " + update.getOperationType());
+            }
+
+            requests.add(req);
+        }
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("requests", requests);
+        // 使用 -1 表示最新版本，或传入具体的 revision_id
+        body.put("document_revision_id", request.getRevisionId() != null ? request.getRevisionId() : -1);
+
+        try {
+            FeishuApiResponse<UpdateResponseData> response = httpClient.patch(
+                    url,
+                    feishuAuthService.getAccessToken(),
+                    body,
+                    UpdateResponseData.class
+            );
+
+            return DocUpdateResponse.success(
+                    request.getRequests().get(0).getBlockId(),
+                    request.getRequests().get(0).getOperationType(),
+                    response.getData() != null ? response.getData().revisionId : null
+            );
+        } catch (FeishuApiException e) {
+            return DocUpdateResponse.error(e.getApiMessage(), e.getMessage());
+        }
+    }
+
+    private static class UpdateResponseData {
+        public Long revisionId;
+    }
+
+    /**
+     * 解析定位信息，获取目标块ID和块类型
+     */
+    private BlockResolutionResult resolveBlockIdWithType(String documentId, DocumentLocation location) throws IOException {
+        // 优先级 1：直接指定 blockId
+        if (location.hasBlockId()) {
+            return new BlockResolutionResult(location.getBlockId(), false);
+        }
+
+        // 获取文档块列表（排除 page 块）
+        List<DocBlock> blocks = getDocBlocks(documentId, 500);
+        List<DocBlock> editableBlocks = blocks.stream()
+                .filter(b -> !b.isPage())
+                .toList();
+
+        // 优先级 2：按 blockIndex 定位
+        if (location.hasBlockIndex()) {
+            int index = location.getBlockIndex();
+            if (index < 0 || index >= editableBlocks.size()) {
+                throw DocumentOperationException.blockIndexOutOfRange(index, editableBlocks.size() - 1);
+            }
+            return new BlockResolutionResult(editableBlocks.get(index).getBlockId(), false);
+        }
+
+        // 优先级 3：按 blockType 定位（返回第一个匹配的块）
+        if (location.hasBlockType()) {
+            String blockId = editableBlocks.stream()
+                    .filter(b -> b.getBlockType() == location.getBlockType())
+                    .findFirst()
+                    .map(DocBlock::getBlockId)
+                    .orElseThrow(() -> DocumentOperationException.blockTypeNotFound(location.getBlockType().name()));
+            return new BlockResolutionResult(blockId, false);
+        }
+
+        // 优先级 4：按 positionHint 定位（简单启发式）
+        if (location.hasPositionHint()) {
+            return resolveByPositionHintWithType(blocks, editableBlocks, location.getPositionHint());
+        }
+
+        throw DocumentOperationException.invalidLocation();
+    }
+
+    /**
+     * 块解析结果
+     */
+    private static class BlockResolutionResult {
+        private final String blockId;
+        private final boolean pageBlock;
+
+        public BlockResolutionResult(String blockId, boolean pageBlock) {
+            this.blockId = blockId;
+            this.pageBlock = pageBlock;
+        }
+
+        public String getBlockId() {
+            return blockId;
+        }
+
+        public boolean isPageBlock() {
+            return pageBlock;
+        }
+    }
+
+    /**
+     * 根据位置描述解析块ID（简单启发式实现）
+     * 当文档为空时，返回 page 块ID以便添加新内容
+     */
+    private BlockResolutionResult resolveByPositionHintWithType(List<DocBlock> allBlocks, List<DocBlock> editableBlocks, String hint) {
+        String normalized = hint.toLowerCase().trim();
+
+        // 如果文档为空（没有可编辑块），返回 page 块的ID
+        DocBlock pageBlock = allBlocks.stream()
+                .filter(DocBlock::isPage)
+                .findFirst()
+                .orElse(null);
+
+        if (editableBlocks.isEmpty()) {
+            if (pageBlock != null) {
+                return new BlockResolutionResult(pageBlock.getBlockId(), true);
+            }
+            return null;
+        }
+
+        // "开头"、"第一" -> 第一个块
+        if (normalized.contains("开头") || normalized.contains("第一") || normalized.contains("first")) {
+            return new BlockResolutionResult(editableBlocks.get(0).getBlockId(), false);
+        }
+
+        // "末尾"、"最后"、"结尾" -> 最后一个块
+        if (normalized.contains("末尾") || normalized.contains("最后") || normalized.contains("结尾")
+                || normalized.contains("last") || normalized.contains("end")) {
+            return new BlockResolutionResult(editableBlocks.get(editableBlocks.size() - 1).getBlockId(), false);
+        }
+
+        // "标题" -> 第一个标题块
+        if (normalized.contains("标题") || normalized.contains("heading")) {
+            String blockId = editableBlocks.stream()
+                    .filter(DocBlock::isHeading)
+                    .findFirst()
+                    .map(DocBlock::getBlockId)
+                    .orElseThrow(() -> DocumentOperationException.blockTypeNotFound("heading"));
+            return new BlockResolutionResult(blockId, false);
+        }
+
+        // 默认返回第一个块
+        return new BlockResolutionResult(editableBlocks.get(0).getBlockId(), false);
+    }
+
+    /**
+     * 构建更新请求列表
+     * @param blockId 目标块ID
+     * @param text 文本内容
+     * @param operation 操作类型
+     * @param documentId 文档ID
+     * @param isPageBlock 是否定位到 page 块（用于判断是否需要添加子块）
+     */
+    private List<DocBlockUpdate> buildUpdateRequests(String blockId, String text, String operation,
+                                                      String documentId, boolean isPageBlock) throws IOException {
+        List<DocBlockUpdate> requests = new ArrayList<>();
+
+        // 如果是 page 块，使用 insert_block_children 添加子块
+        if (isPageBlock) {
+            String[] lines = text.split("\n");
+            List<DocElement> elements = new ArrayList<>();
+            for (String line : lines) {
+                if (!line.trim().isEmpty()) {
+                    elements.add(DocElement.text(line));
                 }
             }
+            requests.add(DocBlockUpdate.insertBlock(blockId, elements, null));
+            return requests;
+        }
+
+        switch (operation.toLowerCase()) {
+            case "replace" -> {
+                // 直接替换内容
+                requests.add(DocBlockUpdate.updateText(blockId, text));
+            }
+            case "insert" -> {
+                // insert 操作：获取现有内容，追加新内容
+                String existingContent = getBlockContent(documentId, blockId);
+                String newContent = existingContent + text;
+                requests.add(DocBlockUpdate.updateText(blockId, newContent));
+            }
+            case "append" -> {
+                // append 操作：在文档末尾追加新块（简化实现：替换最后一个块）
+                requests.add(DocBlockUpdate.updateText(blockId, text));
+            }
+            default -> throw new IllegalArgumentException("不支持的操作类型: " + operation);
+        }
+
+        return requests;
+    }
+
+    /**
+     * 获取指定块的内容
+     */
+    private String getBlockContent(String documentId, String blockId) throws IOException {
+        String url = buildUrl("/docx/v1/documents/" + documentId + "/blocks/" + blockId);
+
+        try {
+            FeishuApiResponse<JsonNode> response = httpClient.get(
+                    url,
+                    feishuAuthService.getAccessToken(),
+                    JsonNode.class
+            );
+
+            JsonNode block = response.getData().get("block");
+            return extractBlockText(block);
+        } catch (Exception e) {
+            log.warn("获取块内容失败: documentId={}, blockId={}", documentId, blockId, e);
+            return "";
+        }
+    }
+
+    // ==================== 文档清空 ====================
+
+    /**
+     * 清空文档内容
+     */
+    public DocClearResponse clearDoc(String documentId) throws IOException {
+        // 1. 获取文档块列表
+        List<DocBlock> blocks = getDocBlocks(documentId, 500);
+
+        // 2. 找到 page 块和所有可编辑的子块
+        DocBlock pageBlock = blocks.stream()
+                .filter(DocBlock::isPage)
+                .findFirst()
+                .orElseThrow(DocumentOperationException::pageBlockNotFound);
+
+        String pageBlockId = pageBlock.getBlockId();
+
+        // 3. 获取所有非 page 的子块（这些是要删除的）
+        List<DocBlock> childBlocks = blocks.stream()
+                .filter(b -> !b.isPage() && b.getParentId() != null && b.getParentId().equals(pageBlockId))
+                .toList();
+
+        int childrenCount = childBlocks.size();
+
+        // 如果没有子块，直接返回成功
+        if (childrenCount == 0) {
+            log.info("文档 {} 没有可删除的内容块", documentId);
+            return DocClearResponse.empty();
+        }
+
+        log.info("准备清空文档 {}，找到 {} 个内容块", documentId, childrenCount);
+
+        // 4. 调用 batch_delete 删除 page 块下的所有子块
+        // 使用 start_index=0, end_index=childrenCount 删除全部
+        String deleteUrl = buildUrl("/docx/v1/documents/" + documentId +
+                "/blocks/" + pageBlockId +
+                "/children/batch_delete");
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("start_index", 0);
+        body.put("end_index", childrenCount);
+
+        log.debug("清空文档请求: url={}, body={}", deleteUrl, objectMapper.writeValueAsString(body));
+
+        try {
+            FeishuApiResponse<ClearResponseData> response = httpClient.delete(
+                    deleteUrl,
+                    feishuAuthService.getAccessToken(),
+                    body,
+                    ClearResponseData.class
+            );
+
+            return DocClearResponse.success(
+                    childrenCount,
+                    pageBlockId,
+                    response.getData() != null ? response.getData().revisionId : null
+            );
+        } catch (FeishuApiException e) {
+            log.error("清空文档失败: {}", e.getApiMessage(), e);
+            return DocClearResponse.error(e.getApiMessage());
+        }
+    }
+
+    private static class ClearResponseData {
+        public Long revisionId;
+    }
+
+    // ==================== 评论相关 ====================
+
+    /**
+     * 获取文档评论列表
+     * 使用 /drive/v1/files/{file_token}/comments API
+     */
+    public List<DocComment> getDocComments(String documentId) throws IOException {
+        String url = buildUrl("/drive/v1/files/" + documentId + "/comments?file_type=docx");
+
+        FeishuApiResponse<JsonNode> response = httpClient.get(
+                url,
+                feishuAuthService.getAccessToken(),
+                JsonNode.class
+        );
+
+        log.debug("评论列表API响应: {}", objectMapper.writeValueAsString(response.getData()));
+
+        return convertDriveComments(response.getData());
+    }
+
+    /**
+     * 转换 drive API 的评论列表
+     */
+    private List<DocComment> convertDriveComments(JsonNode data) {
+        List<DocComment> comments = new ArrayList<>();
+        if (data == null || !data.has("items")) {
             return comments;
         }
+
+        JsonNode items = data.get("items");
+        for (JsonNode item : items) {
+            DocComment comment = new DocComment();
+            comment.setCommentId(getText(item, "comment_id"));
+            comment.setContent(extractCommentContent(item));
+            comment.setCreatedBy(getText(item, "user_id"));
+            comment.setCreateTime(getText(item, "create_time"));
+            comment.setQuote(getText(item, "quote"));
+            comments.add(comment);
+        }
+        return comments;
+    }
+
+    /**
+     * 从评论数据中提取评论内容
+     */
+    private String extractCommentContent(JsonNode item) {
+        if (item.has("reply_list") && item.get("reply_list").has("replies")) {
+            JsonNode replies = item.get("reply_list").get("replies");
+            if (replies.isArray() && replies.size() > 0) {
+                JsonNode firstReply = replies.get(0);
+                if (firstReply.has("content") && firstReply.get("content").has("elements")) {
+                    JsonNode elements = firstReply.get("content").get("elements");
+                    StringBuilder content = new StringBuilder();
+                    for (JsonNode element : elements) {
+                        if (element.has("text_run") && element.get("text_run").has("text")) {
+                            content.append(element.get("text_run").get("text").asText());
+                        }
+                    }
+                    return content.toString();
+                }
+            }
+        }
+        return null;
     }
 
     /**
      * 添加文档评论
+     * 使用 /drive/v1/files/{file_token}/comments API
      */
-    public Map<String, Object> addDocComment(String documentId, String content, String quote) throws IOException {
-        String url = feishuProperties.getApiBaseUrl() + "/docx/v1/documents/" + documentId + "/comments";
+    public DocComment addDocComment(String documentId, String content, String quote) throws IOException {
+        // 使用 drive API 添加评论
+        String url = buildUrl("/drive/v1/files/" + documentId + "/comments?file_type=docx");
 
-        StringBuilder requestBodyBuilder = new StringBuilder();
-        requestBodyBuilder.append("{");
-        requestBodyBuilder.append("\"comment\": {");
-        requestBodyBuilder.append("\"content\": \"");
-        String escapedContent = content.replace("\\", "\\\\").replace("\"", "\\\"");
-        requestBodyBuilder.append(escapedContent).append("\"");
-        if (quote != null && !quote.isEmpty()) {
-            requestBodyBuilder.append(", \"quote\": \"").append(quote).append("\"");
-        }
-        requestBodyBuilder.append("}");
-        requestBodyBuilder.append("}");
+        // 构建请求体 - 按照飞书API文档格式
+        Map<String, Object> textRun = new HashMap<>();
+        textRun.put("text", content);
 
-        Request request = new Request.Builder()
-                .url(url)
-                .post(RequestBody.create(requestBodyBuilder.toString(), MediaType.parse("application/json")))
-                .addHeader("Authorization", "Bearer " + feishuAuthService.getAccessToken())
-                .build();
+        Map<String, Object> element = new HashMap<>();
+        element.put("type", "text_run");
+        element.put("text_run", textRun);
 
-        try (Response response = httpClient.newCall(request).execute()) {
-            String responseBody = response.body().string();
-            JsonNode jsonNode = objectMapper.readTree(responseBody);
+        List<Map<String, Object>> elements = new ArrayList<>();
+        elements.add(element);
 
-            Map<String, Object> result = new HashMap<>();
-            if (jsonNode.has("data") && jsonNode.get("data").has("comment")) {
-                JsonNode comment = jsonNode.get("data").get("comment");
-                result.put("comment_id", comment.has("comment_id") ? comment.get("comment_id").asText() : null);
+        Map<String, Object> replyContent = new HashMap<>();
+        replyContent.put("elements", elements);
+
+        Map<String, Object> reply = new HashMap<>();
+        reply.put("content", replyContent);
+
+        List<Map<String, Object>> replies = new ArrayList<>();
+        replies.add(reply);
+
+        Map<String, Object> replyList = new HashMap<>();
+        replyList.put("replies", replies);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("reply_list", replyList);
+
+        try {
+            FeishuApiResponse<JsonNode> response = httpClient.post(
+                    url,
+                    feishuAuthService.getAccessToken(),
+                    body,
+                    JsonNode.class
+            );
+
+            JsonNode data = response.getData();
+            if (data == null) {
+                throw new IOException("添加评论失败：API响应中没有数据");
             }
-            result.put("success", jsonNode.has("data"));
+
+            DocComment result = new DocComment();
+            result.setCommentId(getText(data, "comment_id"));
+            result.setContent(content);
+            result.setQuote(quote);
+            result.setCreatedBy(getText(data, "user_id"));
+            result.setCreateTime(getText(data, "create_time"));
             return result;
+        } catch (FeishuApiException e) {
+            throw new IOException("添加评论失败: " + e.getApiMessage(), e);
         }
     }
 
-    /**
-     * 清空文档内容 - 删除文档中所有内容块（保留文档本身）
-     * 使用 DELETE /documents/{id}/blocks/{block_id}/children/batch_delete 删除 page 块下的所有子块
-     * @param documentId 文档ID
-     */
-    public Map<String, Object> clearDoc(String documentId) throws IOException {
-        // 强制刷新token，确保使用最新权限
-//        feishuAuthService.forceRefreshToken();
+    // ==================== 辅助方法 ====================
 
-        // 1. 获取文档块列表，找到 page 块及其子块
-        String blocksUrl = feishuProperties.getApiBaseUrl() + "/docx/v1/documents/" + documentId + "/blocks";
+    private String buildUrl(String path) {
+        return feishuProperties.getApiBaseUrl() + path;
+    }
 
-        Request getRequest = new Request.Builder()
-                .url(blocksUrl + "?page_size=500")
-                .get()
-                .addHeader("Authorization", "Bearer " + feishuAuthService.getAccessToken())
-                .build();
+    private String buildDocumentUrl(String token) {
+        return "https://open.feishu.cn/document/" + token;
+    }
 
-        String pageBlockId = null;
-        int childrenCount = 0;
-
-        try (Response response = httpClient.newCall(getRequest).execute()) {
-            String responseBody = response.body().string();
-            JsonNode jsonNode = objectMapper.readTree(responseBody);
-
-            if (jsonNode.has("data") && jsonNode.get("data").has("items")) {
-                JsonNode items = jsonNode.get("data").get("items");
-                for (JsonNode item : items) {
-                    if (item.has("block_type") && item.has("block_id")) {
-                        int blockType = item.get("block_type").asInt();
-                        // 找到 page 块
-                        if (blockType == 1) {
-                            pageBlockId = item.get("block_id").asText();
-                            // 获取 page 块的子块数量
-                            if (item.has("children") && !item.get("children").isNull()) {
-                                childrenCount = item.get("children").size();
-                            }
-                            break;
-                        }
-                    }
-                }
-            }
+    private String getText(JsonNode node, String field) {
+        if (node != null && node.has(field) && !node.get(field).isNull()) {
+            return node.get(field).asText();
         }
+        return null;
+    }
 
-        Map<String, Object> result = new HashMap<>();
-
-        if (pageBlockId == null) {
-            result.put("success", false);
-            result.put("error", "未找到文档的 page 块");
-            return result;
+    private Long getLong(JsonNode node, String field) {
+        if (node != null && node.has(field) && !node.get(field).isNull()) {
+            return node.get(field).asLong();
         }
+        return null;
+    }
 
-        result.put("page_block_id", pageBlockId);
-        result.put("children_count", childrenCount);
-
-        if (childrenCount == 0) {
-            result.put("deleted_count", 0);
-            result.put("success", true);
-            return result;
+    private int getInt(JsonNode node, String field, int defaultValue) {
+        if (node != null && node.has(field) && !node.get(field).isNull()) {
+            return node.get(field).asInt();
         }
+        return defaultValue;
+    }
 
-        // 2. 调用 batch_delete 删除 page 块下的所有子块
-        String deleteUrl = feishuProperties.getApiBaseUrl() +
-                "/docx/v1/documents/" + documentId +
-                "/blocks/" + pageBlockId +
-                "/children/batch_delete?document_revision_id=-1";
-
-        String requestBodyJson = "{\"start_index\": 0, \"end_index\": " + childrenCount + "}";
-
-        RequestBody requestBody = RequestBody.create(requestBodyJson, MediaType.parse("application/json; charset=utf-8"));
-        Request deleteRequest = new Request.Builder()
-                .url(deleteUrl)
-                .delete(requestBody)
-                .addHeader("Authorization", "Bearer " + feishuAuthService.getAccessToken())
-                .addHeader("Content-Type", "application/json; charset=utf-8")
-                .build();
-
-        try (Response response = httpClient.newCall(deleteRequest).execute()) {
-            String responseBody = response.body().string();
-            JsonNode jsonNode = objectMapper.readTree(responseBody);
-
-            if (response.isSuccessful() && jsonNode.has("code") && jsonNode.get("code").asInt() == 0) {
-                result.put("deleted_count", childrenCount);
-                result.put("success", true);
-                if (jsonNode.has("data") && jsonNode.get("data").has("document_revision_id")) {
-                    result.put("document_revision_id", jsonNode.get("data").get("document_revision_id").asInt());
-                }
-            } else {
-                result.put("deleted_count", 0);
-                result.put("success", false);
-                result.put("error", jsonNode.has("msg") ? jsonNode.get("msg").asText() : "HTTP " + response.code());
-                result.put("raw_response", responseBody);
-                log.error("批量删除块失败: documentId={}, response={}", documentId, responseBody);
-            }
-        } catch (Exception e) {
-            log.error("批量删除块请求异常: documentId={}, error={}", documentId, e.getMessage());
-            result.put("deleted_count", 0);
-            result.put("success", false);
-            result.put("error", "Exception: " + e.getMessage());
+    private boolean getBoolean(JsonNode node, String field, boolean defaultValue) {
+        if (node != null && node.has(field) && !node.get(field).isNull()) {
+            return node.get(field).asBoolean();
         }
-
-        return result;
+        return defaultValue;
     }
 }

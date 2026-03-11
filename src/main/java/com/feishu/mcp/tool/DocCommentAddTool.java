@@ -4,13 +4,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.feishu.mcp.dto.doc.DocComment;
 import com.feishu.mcp.mcp.protocol.McpTool;
 import com.feishu.mcp.service.FeishuDocService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-
-import java.util.Map;
 
 /**
  * 文档评论添加工具 - 添加文档评论
@@ -63,7 +62,7 @@ public class DocCommentAddTool implements McpTool {
         String content = parameters.get("content").asText();
         String quote = parameters.has("quote") ? parameters.get("quote").asText() : null;
 
-        Map<String, Object> result = feishuDocService.addDocComment(documentId, content, quote);
+        DocComment result = feishuDocService.addDocComment(documentId, content, quote);
 
         return objectMapper.valueToTree(result);
     }

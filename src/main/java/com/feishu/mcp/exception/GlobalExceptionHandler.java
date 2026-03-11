@@ -1,5 +1,6 @@
 package com.feishu.mcp.exception;
 
+import com.feishu.mcp.constant.McpConstants;
 import com.feishu.mcp.mcp.protocol.JsonRpcResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,8 +24,30 @@ public class GlobalExceptionHandler {
         log.warn("非法参数: {}", e.getMessage());
         JsonRpcResponse response = JsonRpcResponse.error(
                 null,
-                -32602,
+                McpConstants.ERROR_INVALID_PARAMS,
                 "Invalid params: " + e.getMessage()
+        );
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    @ExceptionHandler(FeishuApiException.class)
+    public ResponseEntity<JsonRpcResponse> handleFeishuApiException(FeishuApiException e) {
+        log.error("飞书API调用失败: [{}] {}", e.getCode(), e.getApiMessage());
+        JsonRpcResponse response = JsonRpcResponse.error(
+                null,
+                McpConstants.ERROR_SERVER_ERROR,
+                "Feishu API error [" + e.getCode() + "]: " + e.getApiMessage()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(response);
+    }
+
+    @ExceptionHandler(DocumentOperationException.class)
+    public ResponseEntity<JsonRpcResponse> handleDocumentOperationException(DocumentOperationException e) {
+        log.error("文档操作失败: {}", e.getMessage());
+        JsonRpcResponse response = JsonRpcResponse.error(
+                null,
+                McpConstants.ERROR_INTERNAL_ERROR,
+                "Document operation failed: " + e.getMessage()
         );
         return ResponseEntity.badRequest().body(response);
     }
@@ -34,7 +57,7 @@ public class GlobalExceptionHandler {
         log.error("IO错误: {}", e.getMessage(), e);
         JsonRpcResponse response = JsonRpcResponse.error(
                 null,
-                -32603,
+                McpConstants.ERROR_INTERNAL_ERROR,
                 "IO error: " + e.getMessage()
         );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
@@ -45,7 +68,7 @@ public class GlobalExceptionHandler {
         log.error("未预期的错误: {}", e.getMessage(), e);
         JsonRpcResponse response = JsonRpcResponse.error(
                 null,
-                -32603,
+                McpConstants.ERROR_INTERNAL_ERROR,
                 "Internal error: " + e.getMessage()
         );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);

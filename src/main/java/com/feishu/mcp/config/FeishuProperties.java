@@ -14,7 +14,7 @@ public class FeishuProperties {
     private String appSecret;
     private String authMode = "app";
     private String userCode;
-    private String apiBaseUrl = "https://open.feishu.cn/open_api";
+    private String apiBaseUrl = "https://open.feishu.cn/open-apis";
 
     public String getAppId() {
         return appId;

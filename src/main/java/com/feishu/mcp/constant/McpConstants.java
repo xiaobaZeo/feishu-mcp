@@ -25,7 +25,7 @@ public class McpConstants {
 
     // 传输模式
     public static final String TRANSPORT_STDIO = "stdio";
-    public static final String TRANSPORT_SSE = "sse";
+    public static final String TRANSPORT_HTTP = "http";
     public static final String TRANSPORT_BOTH = "both";
 
     // 认证模式
@@ -36,6 +36,15 @@ public class McpConstants {
     public static final String FEISHU_API_BASE_URL = "https://open.feishu.cn/open_api";
     public static final int DEFAULT_PAGE_SIZE = 10;
     public static final int DEFAULT_PAGE = 1;
+
+    // 文档操作相关
+    public static final String DOC_OPERATION_REPLACE = "replace";
+    public static final String DOC_OPERATION_INSERT = "insert";
+    public static final String DOC_OPERATION_APPEND = "append";
+
+    // 内容格式
+    public static final String FORMAT_PLAIN = "plain";
+    public static final String FORMAT_MARKDOWN = "markdown";
 
     private McpConstants() {
         // 私有构造函数，防止实例化

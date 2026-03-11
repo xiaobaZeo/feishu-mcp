@@ -3,6 +3,7 @@ package com.feishu.mcp.tool;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.feishu.mcp.dto.doc.DocComment;
 import com.feishu.mcp.mcp.protocol.McpTool;
 import com.feishu.mcp.service.FeishuDocService;
 import lombok.RequiredArgsConstructor;
@@ -10,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 文档评论列表工具 - 查看云文档的评论
@@ -52,7 +52,7 @@ public class DocCommentListTool implements McpTool {
     public JsonNode execute(JsonNode parameters) throws Exception {
         String documentId = parameters.get("document_id").asText();
 
-        List<Map<String, Object>> comments = feishuDocService.getDocComments(documentId);
+        List<DocComment> comments = feishuDocService.getDocComments(documentId);
 
         ObjectNode result = objectMapper.createObjectNode();
         result.putPOJO("comments", comments);

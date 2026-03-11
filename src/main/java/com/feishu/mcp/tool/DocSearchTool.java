@@ -2,15 +2,16 @@ package com.feishu.mcp.tool;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.feishu.mcp.dto.doc.DocSearchRequest;
+import com.feishu.mcp.dto.doc.DocSearchResult;
 import com.feishu.mcp.mcp.protocol.McpTool;
 import com.feishu.mcp.service.FeishuDocService;
+import com.feishu.mcp.util.SchemaBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 文档搜索工具 - 搜索云文档
@@ -30,49 +31,49 @@ public class DocSearchTool implements McpTool {
 
     @Override
     public String getDescription() {
-        return "根据关键词、创建者等条件，在飞书云文档中进行精确或模糊搜索";
+        return "根据关键词搜索飞书云文档，支持按创建者过滤";
     }
 
     @Override
     public JsonNode getInputSchema() {
-        ObjectNode schema = objectMapper.createObjectNode();
-        schema.put("type", "object");
-
-        ObjectNode properties = objectMapper.createObjectNode();
-        properties.set("query", objectMapper.createObjectNode()
-                .put("type", "string")
-                .put("description", "搜索关键词"));
-        properties.set("creator", objectMapper.createObjectNode()
-                .put("type", "string")
-                .put("description", "创建者用户ID（可选）"));
-        properties.set("page_size", objectMapper.createObjectNode()
-                .put("type", "integer")
-                .put("description", "每页返回数量，默认10")
-                .put("default", 10));
-        properties.set("page", objectMapper.createObjectNode()
-                .put("type", "integer")
-                .put("description", "页码，从1开始")
-                .put("default", 1));
-
-        schema.set("properties", properties);
-        schema.put("required", objectMapper.createArrayNode().add("query"));
-        return schema;
+        return new SchemaBuilder(objectMapper)
+                .addString("query", "搜索关键词", true)
+                .addString("creator", "创建者用户ID（可选）", false)
+                .addInteger("page_size", "每页返回数量", false, 10)
+                .addInteger("page", "页码，从1开始", false, 1)
+                .build();
     }
 
     @Override
     public JsonNode execute(JsonNode parameters) throws Exception {
-        String query = parameters.has("query") ? parameters.get("query").asText() : "";
-        String creator = parameters.has("creator") ? parameters.get("creator").asText() : null;
-        int pageSize = parameters.has("page_size") ? parameters.get("page_size").asInt() : 10;
-        int page = parameters.has("page") ? parameters.get("page").asInt() : 1;
+        // 构建请求
+        DocSearchRequest request = DocSearchRequest.builder()
+                .query(getString(parameters, "query", ""))
+                .creator(getString(parameters, "creator", null))
+                .pageSize(getInt(parameters, "page_size", 10))
+                .page(getInt(parameters, "page", 1))
+                .build();
 
-        List<Map<String, Object>> docs = feishuDocService.searchDocs(query, creator, pageSize, page);
+        log.info("搜索文档: query={}", request.getQuery());
 
-        ObjectNode result = objectMapper.createObjectNode();
-        result.putPOJO("documents", docs);
-        result.put("total", docs.size());
-        result.put("query", query);
+        List<DocSearchResult> results = feishuDocService.searchDocs(request);
 
-        return result;
+        // 构建响应
+        return objectMapper.valueToTree(new SearchResultWrapper(results, request.getQuery()));
+    }
+
+    private String getString(JsonNode node, String field, String defaultValue) {
+        return node.has(field) && !node.get(field).isNull() ? node.get(field).asText() : defaultValue;
+    }
+
+    private int getInt(JsonNode node, String field, int defaultValue) {
+        return node.has(field) && !node.get(field).isNull() ? node.get(field).asInt() : defaultValue;
+    }
+
+    // 内部包装类，用于序列化
+    private record SearchResultWrapper(List<DocSearchResult> documents, String query, int total) {
+        SearchResultWrapper(List<DocSearchResult> documents, String query) {
+            this(documents, query, documents.size());
+        }
     }
 }
