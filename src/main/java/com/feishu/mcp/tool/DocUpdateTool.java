@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.feishu.mcp.constant.DocBlockType;
+import com.feishu.mcp.constant.McpConstants;
 import com.feishu.mcp.dto.doc.DocUpdateResponse;
 import com.feishu.mcp.dto.doc.DocumentLocation;
 import com.feishu.mcp.mcp.protocol.McpTool;
@@ -59,13 +60,13 @@ public class DocUpdateTool implements McpTool {
 
         // 操作类型
         ArrayNode operationEnum = objectMapper.createArrayNode();
-        operationEnum.add("replace");
-        operationEnum.add("insert");
-        operationEnum.add("append");
+        operationEnum.add(McpConstants.DOC_OPERATION_REPLACE);
+        operationEnum.add(McpConstants.DOC_OPERATION_INSERT);
+        operationEnum.add(McpConstants.DOC_OPERATION_APPEND);
         properties.set("operation", objectMapper.createObjectNode()
                 .put("type", "string")
                 .put("description", "操作类型：replace（替换）、insert（追加到现有内容后）、append（在指定位置后新增）")
-                .put("default", "replace")
+                .put("default", McpConstants.DOC_OPERATION_REPLACE)
                 .set("enum", operationEnum));
 
         // 定位参数（多种方式，至少提供一种）
@@ -105,7 +106,7 @@ public class DocUpdateTool implements McpTool {
         // 解析文档ID（支持URL）
         String documentId = FeishuUrlParser.extractDocumentId(parameters.get("document_id").asText());
         String text = parameters.get("text").asText();
-        String operation = getString(parameters, "operation", "replace");
+        String operation = getString(parameters, "operation", McpConstants.DOC_OPERATION_REPLACE);
 
         // 构建定位信息
         DocumentLocation location = DocumentLocation.builder()

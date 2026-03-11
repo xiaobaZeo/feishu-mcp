@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feishu.mcp.dto.doc.DocSearchRequest;
 import com.feishu.mcp.dto.doc.DocSearchResult;
+import com.feishu.mcp.constant.McpConstants;
 import com.feishu.mcp.mcp.protocol.McpTool;
 import com.feishu.mcp.service.FeishuDocService;
 import com.feishu.mcp.util.SchemaBuilder;
@@ -39,8 +40,8 @@ public class DocSearchTool implements McpTool {
         return new SchemaBuilder(objectMapper)
                 .addString("query", "搜索关键词", true)
                 .addString("creator", "创建者用户ID（可选）", false)
-                .addInteger("page_size", "每页返回数量", false, 10)
-                .addInteger("page", "页码，从1开始", false, 1)
+                .addInteger("page_size", "每页返回数量", false, McpConstants.DEFAULT_PAGE_SIZE)
+                .addInteger("page", "页码，从1开始", false, McpConstants.DEFAULT_PAGE)
                 .build();
     }
 
@@ -50,8 +51,8 @@ public class DocSearchTool implements McpTool {
         DocSearchRequest request = DocSearchRequest.builder()
                 .query(getString(parameters, "query", ""))
                 .creator(getString(parameters, "creator", null))
-                .pageSize(getInt(parameters, "page_size", 10))
-                .page(getInt(parameters, "page", 1))
+                .pageSize(getInt(parameters, "page_size", McpConstants.DEFAULT_PAGE_SIZE))
+                .page(getInt(parameters, "page", McpConstants.DEFAULT_PAGE))
                 .build();
 
         log.info("搜索文档: query={}", request.getQuery());

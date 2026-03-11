@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feishu.mcp.config.FeishuProperties;
 import com.feishu.mcp.constant.DocBlockType;
+import com.feishu.mcp.constant.McpConstants;
 import com.feishu.mcp.dto.doc.*;
 import com.feishu.mcp.exception.DocumentOperationException;
 import com.feishu.mcp.exception.FeishuApiException;
@@ -566,17 +567,17 @@ public class FeishuDocService {
         }
 
         switch (operation.toLowerCase()) {
-            case "replace" -> {
+            case McpConstants.DOC_OPERATION_REPLACE -> {
                 // 直接替换内容
                 requests.add(DocBlockUpdate.updateText(blockId, text));
             }
-            case "insert" -> {
+            case McpConstants.DOC_OPERATION_INSERT -> {
                 // insert 操作：获取现有内容，追加新内容
                 String existingContent = getBlockContent(documentId, blockId);
                 String newContent = existingContent + text;
                 requests.add(DocBlockUpdate.updateText(blockId, newContent));
             }
-            case "append" -> {
+            case McpConstants.DOC_OPERATION_APPEND -> {
                 // append 操作：在文档末尾追加新块（简化实现：替换最后一个块）
                 requests.add(DocBlockUpdate.updateText(blockId, text));
             }

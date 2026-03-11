@@ -47,11 +47,11 @@ public class JsonRpcHandler {
             log.debug("处理MCP请求: method={}, id={}", method, id);
 
             return switch (method) {
-                case "initialize" -> handleInitialize(id);
-                case "tools/list" -> handleToolsList(id);
-                case "tools/call" -> handleToolsCall(id, request.getParams());
-                case "resources/list" -> handleResourcesList(id);
-                case "resources/templates/list" -> handleResourceTemplatesList(id);
+                case McpConstants.METHOD_INITIALIZE -> handleInitialize(id);
+                case McpConstants.METHOD_TOOLS_LIST -> handleToolsList(id);
+                case McpConstants.METHOD_TOOLS_CALL -> handleToolsCall(id, request.getParams());
+                case McpConstants.METHOD_RESOURCES_LIST -> handleResourcesList(id);
+                case McpConstants.METHOD_RESOURCES_TEMPLATES_LIST -> handleResourceTemplatesList(id);
                 default ->
                         JsonRpcResponse.error(id, McpConstants.ERROR_METHOD_NOT_FOUND, "Method not found: " + method);
             };
@@ -66,7 +66,7 @@ public class JsonRpcHandler {
      */
     private JsonRpcResponse handleInitialize(String id) {
         Map<String, Object> result = new HashMap<>();
-        result.put("protocolVersion", "2024-11-05");
+        result.put("protocolVersion", McpConstants.PROTOCOL_VERSION);
         result.put("serverInfo", Map.of(
                 "name", "feishu-mcp-server",
                 "version", "1.0.0"

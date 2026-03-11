@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feishu.mcp.dto.doc.DocCreateRequest;
 import com.feishu.mcp.dto.doc.DocCreateResponse;
+import com.feishu.mcp.constant.McpConstants;
 import com.feishu.mcp.mcp.protocol.McpTool;
 import com.feishu.mcp.service.FeishuDocService;
 import com.feishu.mcp.util.FeishuUrlParser;
@@ -39,7 +40,7 @@ public class DocCreateTool implements McpTool {
                 .addString("title", "文档标题", true)
                 .addString("node_id", "知识空间节点ID（可选，为空则创建在我的文档库）", false)
                 .addString("content", "文档初始内容（可选）", false)
-                .addString("format", "内容格式：plain（纯文本）或 markdown", false, "plain")
+                .addString("format", "内容格式：plain（纯文本）或 markdown", false, McpConstants.FORMAT_PLAIN)
                 .build();
     }
 
@@ -48,7 +49,7 @@ public class DocCreateTool implements McpTool {
         String title = parameters.get("title").asText();
         String nodeId = getString(parameters, "node_id", null);
         String content = getString(parameters, "content", null);
-        String format = getString(parameters, "format", "plain");
+        String format = getString(parameters, "format", McpConstants.FORMAT_PLAIN);
 
         // 处理 node_id（支持从 URL 提取）
         if (nodeId != null && FeishuUrlParser.isValidDocumentIdOrUrl(nodeId)) {

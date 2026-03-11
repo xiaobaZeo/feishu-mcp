@@ -1,5 +1,6 @@
 package com.feishu.mcp.config;
 
+import com.feishu.mcp.constant.McpConstants;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
@@ -12,7 +13,7 @@ public class McpServerProperties {
 
     private String name = "feishu-mcp-server";
     private String version = "1.0.0";
-    private String transport = "both";
+    private String transport = McpConstants.TRANSPORT_BOTH;
     private HttpProperties http = new HttpProperties();
 
     public String getName() {

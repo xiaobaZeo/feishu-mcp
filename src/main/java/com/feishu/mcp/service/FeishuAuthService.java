@@ -3,6 +3,7 @@ package com.feishu.mcp.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feishu.mcp.config.FeishuProperties;
+import com.feishu.mcp.constant.McpConstants;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,7 +110,7 @@ public class FeishuAuthService {
      * 获取当前使用的token
      */
     public String getAccessToken() throws IOException {
-        if ("user".equals(feishuProperties.getAuthMode()) && feishuProperties.getUserCode() != null) {
+        if (McpConstants.AUTH_MODE_USER.equals(feishuProperties.getAuthMode()) && feishuProperties.getUserCode() != null) {
             return getUserAccessToken(feishuProperties.getUserCode());
         }
         return getTenantAccessToken();

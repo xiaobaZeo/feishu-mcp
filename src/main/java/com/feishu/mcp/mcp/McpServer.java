@@ -2,6 +2,7 @@ package com.feishu.mcp.mcp;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.feishu.mcp.config.McpServerProperties;
+import com.feishu.mcp.constant.McpConstants;
 import com.feishu.mcp.mcp.protocol.JsonRpcHandler;
 import com.feishu.mcp.mcp.protocol.JsonRpcRequest;
 import com.feishu.mcp.mcp.protocol.JsonRpcResponse;
@@ -38,7 +39,7 @@ public class McpServer implements CommandLineRunner {
         String transport = mcpServerProperties.getTransport();
         log.info("启动MCP服务器，传输模式: {}", transport);
 
-        if ("stdio".equals(transport) || "both".equals(transport)) {
+        if (McpConstants.TRANSPORT_STDIO.equals(transport) || McpConstants.TRANSPORT_BOTH.equals(transport)) {
             startStdioServer();
         }
 

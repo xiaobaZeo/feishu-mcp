@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.feishu.mcp.mcp.protocol.McpTool;
 import com.feishu.mcp.service.FeishuUserService;
+import com.feishu.mcp.constant.McpConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -44,8 +45,8 @@ public class UserSearchTool implements McpTool {
                 .put("description", "搜索关键词，可以是姓名、邮箱或部门"));
         properties.set("page_size", objectMapper.createObjectNode()
                 .put("type", "integer")
-                .put("description", "每页返回数量，默认10")
-                .put("default", 10));
+                .put("description", "每页返回数量，默认" + McpConstants.DEFAULT_PAGE_SIZE)
+                .put("default", McpConstants.DEFAULT_PAGE_SIZE));
         properties.set("page", objectMapper.createObjectNode()
                 .put("type", "integer")
                 .put("description", "页码，从1开始")
@@ -59,8 +60,8 @@ public class UserSearchTool implements McpTool {
     @Override
     public JsonNode execute(JsonNode parameters) throws Exception {
         String keyword = parameters.has("keyword") ? parameters.get("keyword").asText() : "";
-        int pageSize = parameters.has("page_size") ? parameters.get("page_size").asInt() : 10;
-        int page = parameters.has("page") ? parameters.get("page").asInt() : 1;
+        int pageSize = parameters.has("page_size") ? parameters.get("page_size").asInt() : McpConstants.DEFAULT_PAGE_SIZE;
+        int page = parameters.has("page") ? parameters.get("page").asInt() : McpConstants.DEFAULT_PAGE;
 
         List<Map<String, Object>> users = feishuUserService.searchUsers(keyword, pageSize, page);
 

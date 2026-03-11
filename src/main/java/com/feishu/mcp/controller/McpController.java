@@ -1,5 +1,6 @@
 package com.feishu.mcp.controller;
 
+import com.feishu.mcp.constant.McpConstants;
 import com.feishu.mcp.mcp.protocol.JsonRpcHandler;
 import com.feishu.mcp.mcp.protocol.JsonRpcRequest;
 import com.feishu.mcp.mcp.protocol.JsonRpcResponse;
@@ -50,7 +51,7 @@ public class McpController {
      */
     @GetMapping("/tools")
     public ResponseEntity<JsonRpcResponse> listTools() {
-        JsonRpcRequest request = createRequest("tools/list", new HashMap<>());
+        JsonRpcRequest request = createRequest(McpConstants.METHOD_TOOLS_LIST, new HashMap<>());
         return ResponseEntity.ok(jsonRpcHandler.handle(request));
     }
 

@@ -1,5 +1,6 @@
 package com.feishu.mcp.dto.doc;
 
+import com.feishu.mcp.constant.McpConstants;
 import lombok.Builder;
 import lombok.Data;
 
@@ -24,13 +25,13 @@ public class DocSearchRequest {
      * 每页返回数量，默认 10
      */
     @Builder.Default
-    private int pageSize = 10;
+    private int pageSize = McpConstants.DEFAULT_PAGE_SIZE;
 
     /**
      * 页码，从 1 开始，默认 1
      */
     @Builder.Default
-    private int page = 1;
+    private int page = McpConstants.DEFAULT_PAGE;
 
     /**
      * 搜索范围：all（全部）、mine（我的）

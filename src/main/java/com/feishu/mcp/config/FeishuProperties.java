@@ -1,5 +1,6 @@
 package com.feishu.mcp.config;
 
+import com.feishu.mcp.constant.McpConstants;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
@@ -12,7 +13,7 @@ public class FeishuProperties {
 
     private String appId;
     private String appSecret;
-    private String authMode = "app";
+    private String authMode = McpConstants.AUTH_MODE_APP;
     private String userCode;
     private String apiBaseUrl = "https://open.feishu.cn/open-apis";
 

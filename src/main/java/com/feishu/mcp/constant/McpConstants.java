@@ -33,7 +33,7 @@ public class McpConstants {
     public static final String AUTH_MODE_USER = "user";
 
     // 飞书 API 相关
-    public static final String FEISHU_API_BASE_URL = "https://open.feishu.cn/open_api";
+    public static final String FEISHU_API_BASE_URL = "https://open.feishu.cn/open-apis";
     public static final int DEFAULT_PAGE_SIZE = 10;
     public static final int DEFAULT_PAGE = 1;
 
