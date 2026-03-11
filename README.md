@@ -396,6 +396,7 @@ mcporter start
 | `knowledge_node_docs` | 知识空间文档列表 |
 | `doc_comment_list` | 文档评论列表 |
 | `doc_comment_add` | 添加评论 |
+| `doc_clear` | 清空文档内容（保留文档） |
 
 ## 技术栈
 

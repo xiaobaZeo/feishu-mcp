@@ -33,7 +33,7 @@ public class DocUpdateTool implements McpTool {
 
     @Override
     public String getDescription() {
-        return "在云文档指定位置增加内容，也可完善或替换指定内容";
+        return "在云文档指定位置增加或替换内容。通过 block_index 指定第几个内容块（从0开始，0表示第一个内容块），使用 operation 指定是 insert（追加）还是 replace（替换）";
     }
 
     @Override
@@ -44,26 +44,23 @@ public class DocUpdateTool implements McpTool {
         ObjectNode properties = objectMapper.createObjectNode();
         properties.set("document_id", objectMapper.createObjectNode()
                 .put("type", "string")
-                .put("description", "文档ID"));
-        properties.set("operation", objectMapper.createObjectNode()
-                .put("type", "string")
-                .put("description", "操作类型：insert（插入）或 replace（替换）")
-                .put("enum", objectMapper.createArrayNode().add("insert").add("replace")));
+                .put("description", "文档ID（可以从文档链接中提取，例如 https://my.feishu.cn/wiki/XXXX 中的XXXX部分）"));
         properties.set("text", objectMapper.createObjectNode()
                 .put("type", "string")
                 .put("description", "要插入或替换的文本内容"));
-        properties.set("start_index", objectMapper.createObjectNode()
+        properties.set("operation", objectMapper.createObjectNode()
+                .put("type", "string")
+                .put("description", "操作类型：insert（在现有内容后追加）或 replace（替换现有内容）")
+                .put("enum", objectMapper.createArrayNode().add("insert").add("replace")));
+        properties.set("block_index", objectMapper.createObjectNode()
                 .put("type", "integer")
-                .put("description", "起始位置索引（从0开始）"));
-        properties.set("end_index", objectMapper.createObjectNode()
-                .put("type", "integer")
-                .put("description", "结束位置索引（仅replace操作需要）"));
+                .put("description", "内容块索引（从0开始，0表示第一个可编辑内容块，以此类推）"));
 
         schema.set("properties", properties);
         ArrayNode required = objectMapper.createArrayNode();
         required.add("document_id");
-        required.add("operation");
         required.add("text");
+        required.add("operation");
         schema.set("required", required);
         return schema;
     }
@@ -71,35 +68,13 @@ public class DocUpdateTool implements McpTool {
     @Override
     public JsonNode execute(JsonNode parameters) throws Exception {
         String documentId = parameters.get("document_id").asText();
-        String operation = parameters.get("operation").asText();
         String text = parameters.get("text").asText();
+        String operation = parameters.has("operation") ? parameters.get("operation").asText() : "replace";
+        int blockIndex = parameters.has("block_index") ? parameters.get("block_index").asInt() : 0;
 
-        List<Map<String, Object>> requests = new ArrayList<>();
-
-        if ("replace".equals(operation)) {
-            // 替换操作需要指定范围
-            int startIndex = parameters.has("start_index") ? parameters.get("start_index").asInt() : 0;
-            int endIndex = parameters.has("end_index") ? parameters.get("end_index").asInt() : startIndex;
-
-            Map<String, Object> request = new HashMap<>();
-            request.put("type", "replace");
-            request.put("start_index", startIndex);
-            request.put("end_index", endIndex);
-            request.put("text", text);
-            requests.add(request);
-        } else {
-            // 插入操作
-            int startIndex = parameters.has("start_index") ? parameters.get("start_index").asInt() : 0;
-
-            Map<String, Object> request = new HashMap<>();
-            request.put("type", "insert");
-            request.put("start_index", startIndex);
-            request.put("end_index", startIndex);
-            request.put("text", text);
-            requests.add(request);
-        }
-
-        Map<String, Object> result = feishuDocService.updateDoc(documentId, requests);
+        log.info("更新文档内容: document_id={}, operation={}, block_index={}, text={}",
+                documentId, operation, blockIndex, text);
+        Map<String, Object> result = feishuDocService.updateDocContent(documentId, text, operation, blockIndex);
 
         return objectMapper.valueToTree(result);
     }

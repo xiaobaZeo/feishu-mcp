@@ -114,4 +114,13 @@ public class FeishuAuthService {
         }
         return getTenantAccessToken();
     }
+
+    /**
+     * 强制刷新token（用于权限变更后）
+     */
+    public void forceRefreshToken() {
+        tenantAccessToken = null;
+        tokenExpireTime = 0;
+        log.info("Token已强制刷新，下次请求将获取新token");
+    }
 }
