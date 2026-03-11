@@ -2,7 +2,6 @@ package com.feishu.mcp.tool;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.feishu.mcp.mcp.protocol.McpTool;
 import com.feishu.mcp.service.FeishuDocService;
