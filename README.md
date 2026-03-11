@@ -176,7 +176,7 @@ curl http://localhost:8088/ready
 ```json
 {
   "mcpServers": {
-    "feishu": {
+    "feishu-mcp": {
       "command": "java",
       "args": [
         "-jar",
@@ -208,7 +208,7 @@ curl http://localhost:8088/ready
 ```json
 {
   "mcpServers": {
-    "feishu": {
+    "feishu-mcp": {
       "command": "java",
       "args": [
         "-jar",
@@ -232,7 +232,7 @@ curl http://localhost:8088/ready
 ```json
 {
   "mcpServers": {
-    "feishu": {
+    "feishu-mcp": {
       "command": "java",
       "args": [
         "-jar",
@@ -256,7 +256,7 @@ curl http://localhost:8088/ready
 ```json
 {
   "mcpServers": {
-    "feishu": {
+    "feishu-mcp": {
       "command": "java",
       "args": [
         "-jar",
@@ -280,7 +280,7 @@ curl http://localhost:8088/ready
 ```json
 {
   "mcpServers": {
-    "feishu": {
+    "feishu-mcp": {
       "command": "java",
       "args": [
         "-jar",
@@ -338,7 +338,7 @@ npm install -g mcporter
 ```json
 {
   "mcpServers": {
-    "feishu": {
+    "feishu-mcp": {
       "type": "stdio",
       "command": "java",
       "args": [
@@ -368,7 +368,7 @@ mcporter start
 ```json
 {
   "mcpServers": {
-    "feishu": {
+    "feishu-mcp": {
       "url": "http://localhost:8088/mcp"
     }
   }
@@ -406,6 +406,7 @@ mcporter start
 - Jackson (JSON 处理)
 - OkHttp (HTTP 客户端)
 
-## 许可证
 
-MIT
+## Star History
+
+[![Star History Chart](https://api.star-history.com/image?repos=xiaobaZeo/feishu-mcp&type=date&legend=top-left)](https://www.star-history.com/?repos=xiaobaZeo%2Ffeishu-mcp&type=date&legend=top-left)
